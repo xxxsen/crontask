@@ -8,6 +8,7 @@ type config struct {
 	executor       string
 	params         []string
 	expression     string
+	runWhenStart   bool
 }
 
 type Option func(c *config)
@@ -35,5 +36,11 @@ func WithWorkDir(dir string) Option {
 func WithCronExpression(exp string) Option {
 	return func(c *config) {
 		c.expression = exp
+	}
+}
+
+func WithRunWhenStart(v bool) Option {
+	return func(c *config) {
+		c.runWhenStart = v
 	}
 }

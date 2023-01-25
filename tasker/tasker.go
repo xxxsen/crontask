@@ -37,6 +37,10 @@ func NewTasker(opts ...Option) (*Tasker, error) {
 }
 
 func (t *Tasker) Run() error {
+	if t.c.runWhenStart {
+		t.runWithLockCheck(0)
+	}
+
 	t.isRunning.Store(false)
 	cr := cron.New()
 	_, err := cr.AddFunc(t.c.expression, t.task)

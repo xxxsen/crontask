@@ -5,4 +5,5 @@ const (
 	keyUserID              = "UID"
 	keyGroupID             = "GID"
 	keyEnableUserGroupSpec = "ENABLE_USER_GROUP_SPEC"
+	keyRunWhenStart        = "RUN_WHEN_START"
 )

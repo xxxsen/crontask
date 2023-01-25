@@ -12,6 +12,7 @@ env配置:
 | ENABLE_USER_GROUP_SPEC | bool   | 启用后会以指定的uid、gid执行定时任务程序 |
 | UID                    | int    | uid                                      |
 | GID                    | int    | gid                                      |
+| RUN_WHEN_START         | bool   | 开启后, 在程序启动的时候会先执行一次任务 |
 
 运行:
 

@@ -38,6 +38,18 @@ func mustReadUserGroup() (uint64, uint64) {
 	return uid, gid
 }
 
+func isRunWhenStart() bool {
+	v, ok := os.LookupEnv(keyRunWhenStart)
+	if !ok {
+		return false
+	}
+	bv, err := strconv.ParseBool(v)
+	if err != nil {
+		return false
+	}
+	return bv
+}
+
 func mustGetCWD() string {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -58,6 +70,7 @@ func main() {
 	expression := mustGetCronExpression()
 	var uid, gid uint64 = 0, 0
 	enableUserGroupSpec := false
+	runWhenStart := isRunWhenStart()
 	if isEnableUserGroupSpec() {
 		enableUserGroupSpec = true
 		uid, gid = mustReadUserGroup()
@@ -66,12 +79,14 @@ func main() {
 	program := os.Args[1]
 	args := os.Args[2:]
 
-	log.Printf("tasker init, expression:%s, cred:[enable:%t, uid:%d, gid:%d], cwd:%s, program:%s, args:[%+v]", expression, enableUserGroupSpec, uid, gid, cwd, program, args)
+	log.Printf("tasker init, expression:%s, cred:[enable:%t, uid:%d, gid:%d], run_when_start:%t, cwd:%s, program:%s, args:[%+v]",
+		expression, enableUserGroupSpec, uid, gid, runWhenStart, cwd, program, args)
 
 	opts := []tasker.Option{
 		tasker.WithCronExpression(expression),
 		tasker.WithWorkDir(cwd),
 		tasker.WithProgram(program, args),
+		tasker.WithRunWhenStart(runWhenStart),
 	}
 	if enableUserGroupSpec {
 		opts = append(opts, tasker.WithUserGroup(uid, gid))
