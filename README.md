@@ -13,6 +13,8 @@ env配置:
 | UID                    | int    | uid                                      |
 | GID                    | int    | gid                                      |
 | RUN_WHEN_START         | bool   | 开启后, 在程序启动的时候会先执行一次任务 |
+| REDIRECT_CMD_STDOUT    | string | 将被执行命令的输出流重定向到指定该文件   |
+| REDIRECT_CMD_STDERR    | string | 将被执行命令的错误流重定向到指定文件     |
 
 运行:
 

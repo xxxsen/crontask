@@ -63,6 +63,22 @@ func isEnableUserGroupSpec() bool {
 	return ok
 }
 
+func readRedirectStdOut() string {
+	v, ok := os.LookupEnv(keyRedirectStdOut)
+	if !ok {
+		return ""
+	}
+	return v
+}
+
+func readRedirectStdErr() string {
+	v, ok := os.LookupEnv(keyRedirectStdErr)
+	if !ok {
+		return ""
+	}
+	return v
+}
+
 func main() {
 	if len(os.Args) <= 1 {
 		panic(fmt.Errorf("no exec program found, exp: crontask ${program} [${arg1}, ${arg2}, ...]"))
@@ -78,9 +94,11 @@ func main() {
 	cwd := mustGetCWD()
 	program := os.Args[1]
 	args := os.Args[2:]
+	stdout := readRedirectStdOut()
+	stderr := readRedirectStdErr()
 
-	log.Printf("tasker init, expression:%s, cred:[enable:%t, uid:%d, gid:%d], run_when_start:%t, cwd:%s, program:%s, args:[%+v]",
-		expression, enableUserGroupSpec, uid, gid, runWhenStart, cwd, program, args)
+	log.Printf("tasker init, expression:%s, cred:[enable:%t, uid:%d, gid:%d], redirect_stream:[stdout:%s, stderr:%s], run_when_start:%t, cwd:%s, program:%s, args:[%+v]",
+		expression, enableUserGroupSpec, uid, gid, stdout, stderr, runWhenStart, cwd, program, args)
 
 	opts := []tasker.Option{
 		tasker.WithCronExpression(expression),
@@ -90,6 +108,12 @@ func main() {
 	}
 	if enableUserGroupSpec {
 		opts = append(opts, tasker.WithUserGroup(uid, gid))
+	}
+	if len(stdout) > 0 {
+		opts = append(opts, tasker.WithRedirectStdOut(stdout))
+	}
+	if len(stderr) > 0 {
+		opts = append(opts, tasker.WithRedirectStdErr(stderr))
 	}
 	tk, err := tasker.NewTasker(opts...)
 	if err != nil {

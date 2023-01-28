@@ -9,6 +9,8 @@ type config struct {
 	params         []string
 	expression     string
 	runWhenStart   bool
+	redirectStdOut string
+	redirectStdErr string
 }
 
 type Option func(c *config)
@@ -42,5 +44,17 @@ func WithCronExpression(exp string) Option {
 func WithRunWhenStart(v bool) Option {
 	return func(c *config) {
 		c.runWhenStart = v
+	}
+}
+
+func WithRedirectStdErr(v string) Option {
+	return func(c *config) {
+		c.redirectStdErr = v
+	}
+}
+
+func WithRedirectStdOut(v string) Option {
+	return func(c *config) {
+		c.redirectStdOut = v
 	}
 }
