@@ -11,6 +11,7 @@ type config struct {
 	runWhenStart   bool
 	redirectStdOut string
 	redirectStdErr string
+	tz             string
 }
 
 type Option func(c *config)
@@ -56,5 +57,11 @@ func WithRedirectStdErr(v string) Option {
 func WithRedirectStdOut(v string) Option {
 	return func(c *config) {
 		c.redirectStdOut = v
+	}
+}
+
+func WithTZ(v string) Option {
+	return func(c *config) {
+		c.tz = v
 	}
 }

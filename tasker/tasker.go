@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/robfig/cron/v3"
 	"github.com/xxxsen/common/cmder"
@@ -50,8 +51,12 @@ func (t *Tasker) Run() error {
 	}
 
 	t.isRunning.Store(false)
-	cr := cron.New()
-	_, err := cr.AddFunc(t.c.expression, t.task)
+	loc, err := time.LoadLocation(t.c.tz)
+	if err != nil {
+		return errs.Wrap(errs.ErrParam, "parse time location fail", err)
+	}
+	cr := cron.New(cron.WithLocation(loc))
+	_, err = cr.AddFunc(t.c.expression, t.task)
 	if err != nil {
 		return errs.Wrap(errs.ErrServiceInternal, "add cron task fail", err)
 	}

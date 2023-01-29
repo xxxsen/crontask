@@ -8,4 +8,9 @@ const (
 	keyRunWhenStart        = "RUN_WHEN_START"
 	keyRedirectStdOut      = "REDIRECT_CMD_STDOUT"
 	keyRedirectStdErr      = "REDIRECT_CMD_STDERR"
+	keyTimeZone            = "TZ"
+)
+
+const (
+	defaultTZ = "Asia/Shanghai"
 )
