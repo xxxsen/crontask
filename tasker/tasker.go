@@ -122,10 +122,11 @@ func (t *Tasker) runWithLockCheck(id uint64) {
 		runner.SetID(uint32(t.c.uid), uint32(t.c.gid))
 	}
 	runner.SetOutput(t.createStdOutStream(), t.createStdErrStream())
+	now := time.Now()
 	if err := runner.Run(context.Background(), t.c.executor, t.c.params...); err != nil {
 		log.Printf("id:%d task exec fail, err:%v", id, err)
 		return
 	}
-	log.Printf("id:%d task exec succ", id)
+	log.Printf("id:%d task exec succ, cost:%dms", id, time.Since(now)/time.Millisecond)
 
 }
