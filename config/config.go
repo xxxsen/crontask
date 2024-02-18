@@ -15,13 +15,13 @@ type Program struct {
 }
 
 type Config struct {
-	Log            logger.LogConfig `json:"log"`
-	TZ             string           `json:"tz"`
-	CronExpression string           `json:"cron_expression"`
-	Programs       []Program        `json:"programs"`
-	RunWhenStart   bool             `json:"run_when_start"`
-	RedirectStdout string           `json:"redirect_stdout"`
-	RedirectStderr string           `json:"redirect_stderr"`
+	Log                logger.LogConfig `json:"log"`
+	TZ                 string           `json:"tz"`
+	CrontaskExpression string           `json:"crontask_expression"`
+	Programs           []Program        `json:"programs"`
+	RunWhenStart       bool             `json:"run_when_start"`
+	RedirectStdout     string           `json:"redirect_stdout"`
+	RedirectStderr     string           `json:"redirect_stderr"`
 }
 
 func Parse(file string) (*Config, error) {

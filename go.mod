@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/xxxsen/common v0.1.1
+	github.com/xxxsen/common v0.1.2
 	go.uber.org/zap v1.23.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
