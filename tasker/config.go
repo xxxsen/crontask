@@ -1,12 +1,14 @@
 package tasker
 
+type prg struct {
+	remark  string
+	cmd     string
+	args    []string
+	workdir string
+}
+
 type config struct {
-	enableUserCred bool
-	uid            uint64
-	gid            uint64
-	workdir        string
-	executor       string
-	params         []string
+	prgs           []prg
 	expression     string
 	runWhenStart   bool
 	redirectStdOut string
@@ -16,23 +18,14 @@ type config struct {
 
 type Option func(c *config)
 
-func WithUserGroup(uid, gid uint64) Option {
+func WithAddProgram(remark string, workdir string, cmd string, args []string) Option {
 	return func(c *config) {
-		c.enableUserCred = true
-		c.uid, c.gid = uid, gid
-	}
-}
-
-func WithProgram(exec string, args []string) Option {
-	return func(c *config) {
-		c.executor = exec
-		c.params = args
-	}
-}
-
-func WithWorkDir(dir string) Option {
-	return func(c *config) {
-		c.workdir = dir
+		c.prgs = append(c.prgs, prg{
+			remark:  remark,
+			cmd:     cmd,
+			args:    args,
+			workdir: workdir,
+		})
 	}
 }
 
