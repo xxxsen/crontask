@@ -124,6 +124,7 @@ func (t *Tasker) createStdErrStream() io.Writer {
 }
 
 func (t *Tasker) runNotify(id uint64, name string, cost time.Duration, err error) {
+	logger := logutil.GetLogger(context.Background()).With(zap.String("task", name), zap.Uint64("run_id", id))
 	runNotify := make([]*prg, 0, 3)
 	if t.c.onFinish != nil {
 		runNotify = append(runNotify, t.c.onFinish)
@@ -142,7 +143,7 @@ func (t *Tasker) runNotify(id uint64, name string, cost time.Duration, err error
 			args:    args,
 			workdir: nt.workdir,
 		}); err != nil {
-			logutil.GetLogger(context.Background()).Error("run notify failed", zap.Error(err), zap.String("remark", nt.remark))
+			logger.Error("run notify failed", zap.Error(err), zap.String("remark", nt.remark))
 		}
 	}
 }
