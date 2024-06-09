@@ -85,7 +85,16 @@ func runWithConfig(c *config.Config) {
 	if len(c.RedirectStdout) > 0 {
 		opts = append(opts, tasker.WithRedirectStdOut(c.RedirectStdout))
 	}
-	tk, err := tasker.NewTasker(opts...)
+	if c.Notify.Succ != nil {
+		opts = append(opts, tasker.WithSuccNotify(c.Notify.Succ.Cmd, c.Notify.Succ.Args))
+	}
+	if c.Notify.Fail != nil {
+		opts = append(opts, tasker.WithFailNotify(c.Notify.Fail.Cmd, c.Notify.Fail.Args))
+	}
+	if c.Notify.Finish != nil {
+		opts = append(opts, tasker.WithFinishNotify(c.Notify.Finish.Cmd, c.Notify.Finish.Args))
+	}
+	tk, err := tasker.NewTasker(c.TaskName, opts...)
 	if err != nil {
 		logger.Fatal("create tasker fail", zap.Error(err))
 	}

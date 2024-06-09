@@ -14,6 +14,9 @@ type config struct {
 	redirectStdOut string
 	redirectStdErr string
 	tz             string
+	onSucc         *prg
+	onFail         *prg
+	onFinish       *prg
 }
 
 type Option func(c *config)
@@ -56,5 +59,35 @@ func WithRedirectStdOut(v string) Option {
 func WithTZ(v string) Option {
 	return func(c *config) {
 		c.tz = v
+	}
+}
+
+func WithSuccNotify(cmd string, args []string) Option {
+	return func(c *config) {
+		c.onSucc = &prg{
+			remark: "on_succ",
+			cmd:    cmd,
+			args:   args,
+		}
+	}
+}
+
+func WithFailNotify(cmd string, args []string) Option {
+	return func(c *config) {
+		c.onFail = &prg{
+			remark: "on_fail",
+			cmd:    cmd,
+			args:   args,
+		}
+	}
+}
+
+func WithFinishNotify(cmd string, args []string) Option {
+	return func(c *config) {
+		c.onFinish = &prg{
+			remark: "on_finish",
+			cmd:    cmd,
+			args:   args,
+		}
 	}
 }

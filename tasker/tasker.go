@@ -2,9 +2,11 @@ package tasker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,15 +26,18 @@ const (
 )
 
 type Tasker struct {
-	c *config
-
-	id uint64
+	c    *config
+	name string
+	id   uint64
 	//
 	lck       sync.Mutex
 	isRunning atomic.Value
 }
 
-func NewTasker(opts ...Option) (*Tasker, error) {
+func NewTasker(name string, opts ...Option) (*Tasker, error) {
+	if len(name) == 0 {
+		name = "default"
+	}
 	c := &config{}
 	for _, opt := range opts {
 		opt(c)
@@ -43,15 +48,15 @@ func NewTasker(opts ...Option) (*Tasker, error) {
 	if len(c.expression) == 0 {
 		return nil, errs.New(errs.ErrParam, "nil cron expression")
 	}
-	return &Tasker{c: c}, nil
+	return &Tasker{name: name, c: c}, nil
 }
 
 func (t *Tasker) Run() error {
-	if t.c.runWhenStart {
-		t.runPrograms(0, t.c.prgs)
-	}
-
 	t.isRunning.Store(false)
+	if t.c.runWhenStart {
+		t.task()
+		//t.runPrograms(0, t.c.prgs)
+	}
 	crOpts := []cron.Option{}
 	if len(t.c.tz) > 0 {
 		loc, err := time.LoadLocation(t.c.tz)
@@ -83,7 +88,9 @@ func (t *Tasker) task() {
 		t.lck.Unlock()
 	}
 	//
-	t.runPrograms(id, t.c.prgs)
+	start := time.Now()
+	err := t.runPrograms(id, t.c.prgs)
+	t.runNotify(id, t.name, time.Since(start), err)
 	//
 	t.lck.Lock()
 	t.isRunning.Store(false)
@@ -116,22 +123,64 @@ func (t *Tasker) createStdErrStream() io.Writer {
 	return os.Stderr
 }
 
-func (t *Tasker) runPrograms(id uint64, ps []prg) {
+func (t *Tasker) runNotify(id uint64, name string, cost time.Duration, err error) {
+	runNotify := make([]*prg, 0, 3)
+	if t.c.onFinish != nil {
+		runNotify = append(runNotify, t.c.onFinish)
+	}
+	if t.c.onFail != nil && err != nil {
+		runNotify = append(runNotify, t.c.onFail)
+	}
+	if t.c.onSucc != nil && err == nil {
+		runNotify = append(runNotify, t.c.onSucc)
+	}
+	for _, nt := range runNotify {
+		args := t.rewriteNotifyArgs(nt.args, id, name, cost, err)
+		if err := t.runProgram(id, &prg{
+			remark:  nt.remark,
+			cmd:     nt.cmd,
+			args:    args,
+			workdir: nt.workdir,
+		}); err != nil {
+			logutil.GetLogger(context.Background()).Error("run notify failed", zap.Error(err), zap.String("remark", nt.remark))
+		}
+	}
+}
+
+func (t *Tasker) rewriteNotifyArgs(inputArgs []string, id uint64, name string, cost time.Duration, err error) []string {
+	outputArgs := make([]string, 0, len(inputArgs))
+	errMsg := ""
+	if err != nil {
+		errMsg = err.Error()
+	}
+	for _, arg := range inputArgs {
+		arg = strings.ReplaceAll(arg, KeyRunID, fmt.Sprintf("%d", id))
+		arg = strings.ReplaceAll(arg, KeyTaskName, name)
+		arg = strings.ReplaceAll(arg, KeyTaskSucc, fmt.Sprintf("%t", err == nil))
+		arg = strings.ReplaceAll(arg, KeyTaskRunTime, fmt.Sprintf("%dms", cost/time.Millisecond))
+		arg = strings.ReplaceAll(arg, KeyTaskErrMsg, errMsg)
+		outputArgs = append(outputArgs, arg)
+	}
+	return outputArgs
+}
+
+func (t *Tasker) runPrograms(id uint64, ps []prg) error {
 	logger := logutil.GetLogger(context.Background()).With(zap.Uint64("id", id))
-	for _, p := range t.c.prgs {
+	for idx, p := range ps {
 		if err := t.runProgram(id, &p); err != nil {
 			logger.Error("exec sub task failed, skip next", zap.String("remark", p.remark), zap.Error(err))
-			return
+			return fmt.Errorf("step:%d exec failed, err:[%w]", idx, err)
 		}
 	}
 	logger.Info("task exec succ")
+	return nil
 }
 
 func (t *Tasker) runProgram(id uint64, p *prg) error {
 	logger := logutil.GetLogger(context.Background()).With(zap.Uint64("id", id), zap.String("remark", p.remark))
 	defer func() {
 		if rec := recover(); rec != nil {
-			logger.Error("run sub task cause panic", zap.Any("err", rec), zap.String("stack", string(debug.Stack())))
+			logger.Error("run program cause panic", zap.Any("err", rec), zap.String("stack", string(debug.Stack())))
 			return
 		}
 	}()
@@ -141,6 +190,6 @@ func (t *Tasker) runProgram(id uint64, p *prg) error {
 	if err := runner.Run(context.Background(), p.cmd, p.args...); err != nil {
 		return err
 	}
-	logger.Debug("run sub task succ", zap.Duration("cost", time.Since(now)))
+	logger.Debug("run program succ", zap.Duration("cost", time.Since(now)))
 	return nil
 }
