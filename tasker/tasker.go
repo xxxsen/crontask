@@ -165,14 +165,15 @@ func (t *Tasker) rewriteNotifyArgs(inputArgs []string, id uint64, name string, c
 }
 
 func (t *Tasker) runPrograms(id uint64, ps []prg) error {
-	logger := logutil.GetLogger(context.Background()).With(zap.Uint64("id", id))
+	logger := logutil.GetLogger(context.Background()).With(zap.String("task", t.name), zap.Uint64("id", id))
+	start := time.Now()
 	for idx, p := range ps {
 		if err := t.runProgram(id, &p); err != nil {
 			logger.Error("exec sub task failed, skip next", zap.String("remark", p.remark), zap.Error(err))
 			return fmt.Errorf("step:%d exec failed, err:[%w]", idx, err)
 		}
 	}
-	logger.Info("task exec succ")
+	logger.Info("task exec succ", zap.Duration("cost", time.Since(start)))
 	return nil
 }
 
@@ -186,10 +187,8 @@ func (t *Tasker) runProgram(id uint64, p *prg) error {
 	}()
 	runner := cmder.NewCMD(p.workdir)
 	runner.SetOutput(t.createStdOutStream(), t.createStdErrStream())
-	now := time.Now()
 	if err := runner.Run(context.Background(), p.cmd, p.args...); err != nil {
 		return err
 	}
-	logger.Debug("run program succ", zap.Duration("cost", time.Since(now)))
 	return nil
 }
