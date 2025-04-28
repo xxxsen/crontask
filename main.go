@@ -5,7 +5,6 @@ import (
 	"crontask/tasker"
 	"flag"
 	"log"
-	"os"
 
 	"github.com/xxxsen/common/logger"
 	"go.uber.org/zap"
@@ -16,11 +15,6 @@ func buildConfigFromConfigFile() (*config.Config, error) {
 	flag.Parse()
 	c, err := config.Parse(*conf)
 	return c, err
-}
-
-func isOldConfig() bool {
-	_, ok := os.LookupEnv("CRONTASK_EXPRESSION")
-	return ok
 }
 
 func buildConfig() (*config.Config, error) {
