@@ -76,7 +76,7 @@ crontask
         "succ": {
             "cmd": "/usr/bin/echo",
             "args": [
-                "task exec succ, runid:{{TASK_RUN_ID}}, task_name:{{TASK_NAME}}, cost:{{TASK_RUN_TIME}}"
+                "task exec succ, runid:{TASK_RUN_ID}, task_name:{TASK_NAME}, cost:{TASK_RUN_TIME}"
             ]
         }
     }

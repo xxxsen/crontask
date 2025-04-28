@@ -1,12 +1,10 @@
 package tasker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"os"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,14 +12,8 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/xxxsen/common/cmder"
 	"github.com/xxxsen/common/logutil"
+	"github.com/xxxsen/common/replacer"
 	"go.uber.org/zap"
-	"gopkg.in/natefinch/lumberjack.v2"
-)
-
-const (
-	defaultRedirectLogSize      = 10 * 1024 * 1024
-	defaultRedirectLogFileCount = 5
-	defaultRedirectLogKeepDays  = 7
 )
 
 type Tasker struct {
@@ -54,17 +46,8 @@ func (t *Tasker) Run() error {
 	t.isRunning.Store(false)
 	if t.c.runWhenStart {
 		t.task()
-		//t.runPrograms(0, t.c.prgs)
 	}
-	crOpts := []cron.Option{}
-	if len(t.c.tz) > 0 {
-		loc, err := time.LoadLocation(t.c.tz)
-		if err != nil {
-			return fmt.Errorf("parse time location fail, err:%w", err)
-		}
-		crOpts = append(crOpts, cron.WithLocation(loc))
-	}
-	cr := cron.New(crOpts...)
+	cr := cron.New()
 	_, err := cr.AddFunc(t.c.expression, t.task)
 	if err != nil {
 		return fmt.Errorf("add cron task fail, err:%w", err)
@@ -94,32 +77,6 @@ func (t *Tasker) task() {
 	t.lck.Lock()
 	t.isRunning.Store(false)
 	t.lck.Unlock()
-}
-
-func (t *Tasker) defaultStreamByPath(loc string) io.Writer {
-	logger := &lumberjack.Logger{
-		// 日志输出文件路径
-		Filename:   loc,
-		MaxSize:    defaultRedirectLogSize / 1024 / 1024, // megabytes
-		MaxBackups: defaultRedirectLogFileCount,
-		MaxAge:     defaultRedirectLogKeepDays, //days
-		Compress:   false,                      // disabled by default
-	}
-	return logger
-}
-
-func (t *Tasker) createStdOutStream() io.Writer {
-	if len(t.c.redirectStdOut) > 0 {
-		return t.defaultStreamByPath(t.c.redirectStdOut)
-	}
-	return os.Stdout
-}
-
-func (t *Tasker) createStdErrStream() io.Writer {
-	if len(t.c.redirectStdErr) > 0 {
-		return t.defaultStreamByPath(t.c.redirectStdErr)
-	}
-	return os.Stderr
 }
 
 func (t *Tasker) runNotify(id uint64, name string, cost time.Duration, err error) {
@@ -153,12 +110,16 @@ func (t *Tasker) rewriteNotifyArgs(inputArgs []string, id uint64, name string, c
 	if err != nil {
 		errMsg = err.Error()
 	}
+
+	param := map[string]interface{}{
+		KeyRunID:       id,
+		KeyTaskName:    name,
+		KeyTaskSucc:    err == nil,
+		KeyTaskRunTime: cost.Milliseconds(),
+		KeyTaskErrMsg:  errMsg,
+	}
 	for _, arg := range inputArgs {
-		arg = strings.ReplaceAll(arg, KeyRunID, fmt.Sprintf("%d", id))
-		arg = strings.ReplaceAll(arg, KeyTaskName, name)
-		arg = strings.ReplaceAll(arg, KeyTaskSucc, fmt.Sprintf("%t", err == nil))
-		arg = strings.ReplaceAll(arg, KeyTaskRunTime, fmt.Sprintf("%dms", cost/time.Millisecond))
-		arg = strings.ReplaceAll(arg, KeyTaskErrMsg, errMsg)
+		arg = replacer.ReplaceByMap(arg, param)
 		outputArgs = append(outputArgs, arg)
 	}
 	return outputArgs
@@ -185,10 +146,13 @@ func (t *Tasker) runProgram(id uint64, p *prg) error {
 			return
 		}
 	}()
-	runner := cmder.NewCMD(p.workdir)
-	runner.SetOutput(t.createStdOutStream(), t.createStdErrStream())
+	runner := cmder.New(p.workdir)
+	stdout := bytes.Buffer{}
+	stderr := bytes.Buffer{}
+	runner.SetOutput(&stdout, &stderr)
 	if err := runner.Run(context.Background(), p.cmd, p.args...); err != nil {
-		return err
+		return fmt.Errorf("run cmd failed, cmd:%s, err:%w, errmsg:%s", p.cmd, err, stderr.String())
 	}
+	logutil.GetLogger(context.Background()).Info("run cmd succ", zap.String("cmd", p.cmd), zap.String("stdout", stdout.String()), zap.String("stderr", stderr.String()))
 	return nil
 }

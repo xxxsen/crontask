@@ -27,8 +27,6 @@ type Config struct {
 	CrontaskExpression string           `json:"crontask_expression"`
 	Programs           []Program        `json:"programs"`
 	RunWhenStart       bool             `json:"run_when_start"`
-	RedirectStdout     string           `json:"redirect_stdout"`
-	RedirectStderr     string           `json:"redirect_stderr"`
 	Notify             Notify           `json:"notify"`
 }
 

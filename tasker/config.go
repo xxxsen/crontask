@@ -8,15 +8,12 @@ type prg struct {
 }
 
 type config struct {
-	prgs           []prg
-	expression     string
-	runWhenStart   bool
-	redirectStdOut string
-	redirectStdErr string
-	tz             string
-	onSucc         *prg
-	onFail         *prg
-	onFinish       *prg
+	prgs         []prg
+	expression   string
+	runWhenStart bool
+	onSucc       *prg
+	onFail       *prg
+	onFinish     *prg
 }
 
 type Option func(c *config)
@@ -41,24 +38,6 @@ func WithCronExpression(exp string) Option {
 func WithRunWhenStart(v bool) Option {
 	return func(c *config) {
 		c.runWhenStart = v
-	}
-}
-
-func WithRedirectStdErr(v string) Option {
-	return func(c *config) {
-		c.redirectStdErr = v
-	}
-}
-
-func WithRedirectStdOut(v string) Option {
-	return func(c *config) {
-		c.redirectStdOut = v
-	}
-}
-
-func WithTZ(v string) Option {
-	return func(c *config) {
-		c.tz = v
 	}
 }
 

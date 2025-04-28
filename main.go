@@ -10,42 +10,27 @@ import (
 	"go.uber.org/zap"
 )
 
-func buildConfigFromConfigFile() (*config.Config, error) {
-	conf := flag.String("config", "./config.json", "config file")
-	flag.Parse()
-	c, err := config.Parse(*conf)
-	return c, err
-}
-
-func buildConfig() (*config.Config, error) {
-	return buildConfigFromConfigFile()
-}
+var conf = flag.String("config", "./config.json", "config file")
 
 func main() {
-	c, err := buildConfig()
+	flag.Parse()
+	c, err := config.Parse(*conf)
 	if err != nil {
 		log.Fatalf("parse config failed, err:%v", err)
 	}
-	log.Printf("config init succ, c:%+v", *c)
 	runWithConfig(c)
 }
 
 func runWithConfig(c *config.Config) {
 	logger := logger.Init(c.Log.File, c.Log.Level, int(c.Log.FileCount), int(c.Log.FileSize), int(c.Log.KeepDays), c.Log.Console)
+	logger.Info("recv config", zap.Any("config", *c))
 
 	opts := []tasker.Option{
 		tasker.WithCronExpression(c.CrontaskExpression),
-		tasker.WithTZ(c.TZ),
 		tasker.WithRunWhenStart(c.RunWhenStart),
 	}
 	for _, p := range c.Programs {
 		opts = append(opts, tasker.WithAddProgram(p.Remark, p.WorkDir, p.Cmd, p.Args))
-	}
-	if len(c.RedirectStderr) > 0 {
-		opts = append(opts, tasker.WithRedirectStdErr(c.RedirectStderr))
-	}
-	if len(c.RedirectStdout) > 0 {
-		opts = append(opts, tasker.WithRedirectStdOut(c.RedirectStdout))
 	}
 	if c.Notify.Succ != nil {
 		opts = append(opts, tasker.WithSuccNotify(c.Notify.Succ.Cmd, c.Notify.Succ.Args))
@@ -60,6 +45,7 @@ func runWithConfig(c *config.Config) {
 	if err != nil {
 		logger.Fatal("create tasker fail", zap.Error(err))
 	}
+	logger.Info("create tasker success, start it...")
 	if err := tk.Run(); err != nil {
 		logger.Fatal("run tasker fail", zap.Error(err))
 	}
