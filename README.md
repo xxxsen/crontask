@@ -49,9 +49,7 @@ crontask
             "args": [
             ]
         }
-    },
-    "redirect_stdout": "/tmp/test_out", //将输出结果进行重定向
-    "redirect_stderr": "/tmp/test_err"
+    }
 }
 ```
 
