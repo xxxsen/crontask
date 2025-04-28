@@ -4,11 +4,9 @@ import (
 	"crontask/config"
 	"crontask/tasker"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 
-	"github.com/xxxsen/common/envflag"
 	"github.com/xxxsen/common/logger"
 	"go.uber.org/zap"
 )
@@ -20,43 +18,13 @@ func buildConfigFromConfigFile() (*config.Config, error) {
 	return c, err
 }
 
-func buildConfigFromEnv() (*config.Config, error) {
-	if len(os.Args) < 2 {
-		return nil, fmt.Errorf("invalid program name")
-	}
-	c := &config.Config{
-		Log: logger.LogConfig{
-			Level:   "debug",
-			Console: true,
-		},
-	}
-	c.Programs = []config.Program{
-		{
-			Remark: "default",
-			Cmd:    os.Args[1],
-			Args:   os.Args[2:],
-		},
-	}
-	envflag.StringVar(&c.CrontaskExpression, "crontask_expression", "*/1 * * * *", "cron express")
-	envflag.BoolVar(&c.RunWhenStart, "run_when_start", false, "run program when start")
-	envflag.StringVar(&c.RedirectStdout, "redirect_cmd_stdout", "", "redirect stdout to file")
-	envflag.StringVar(&c.RedirectStderr, "redirect_cmd_stderr", "", "redirect stderr to file")
-	envflag.StringVar(&c.TZ, "tz", "Asia/Shanghai", "tz")
-	envflag.Parse()
-	return c, nil
-}
-
 func isOldConfig() bool {
 	_, ok := os.LookupEnv("CRONTASK_EXPRESSION")
 	return ok
 }
 
 func buildConfig() (*config.Config, error) {
-	if !isOldConfig() {
-		return buildConfigFromConfigFile()
-	}
-	log.Printf("WARN: build config from env, should migrate to config file mode")
-	return buildConfigFromEnv()
+	return buildConfigFromConfigFile()
 }
 
 func main() {

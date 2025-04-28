@@ -13,7 +13,6 @@ import (
 
 	"github.com/robfig/cron/v3"
 	"github.com/xxxsen/common/cmder"
-	"github.com/xxxsen/common/errs"
 	"github.com/xxxsen/common/logutil"
 	"go.uber.org/zap"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -43,10 +42,10 @@ func NewTasker(name string, opts ...Option) (*Tasker, error) {
 		opt(c)
 	}
 	if len(c.prgs) == 0 {
-		return nil, errs.New(errs.ErrParam, "nil program")
+		return nil, fmt.Errorf("nil program")
 	}
 	if len(c.expression) == 0 {
-		return nil, errs.New(errs.ErrParam, "nil cron expression")
+		return nil, fmt.Errorf("nil cron expression")
 	}
 	return &Tasker{name: name, c: c}, nil
 }
@@ -61,14 +60,14 @@ func (t *Tasker) Run() error {
 	if len(t.c.tz) > 0 {
 		loc, err := time.LoadLocation(t.c.tz)
 		if err != nil {
-			return errs.Wrap(errs.ErrParam, "parse time location fail", err)
+			return fmt.Errorf("parse time location fail, err:%w", err)
 		}
 		crOpts = append(crOpts, cron.WithLocation(loc))
 	}
 	cr := cron.New(crOpts...)
 	_, err := cr.AddFunc(t.c.expression, t.task)
 	if err != nil {
-		return errs.Wrap(errs.ErrServiceInternal, "add cron task fail", err)
+		return fmt.Errorf("add cron task fail, err:%w", err)
 	}
 	cr.Run()
 	return nil
