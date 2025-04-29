@@ -11,9 +11,6 @@ type config struct {
 	prgs         []prg
 	expression   string
 	runWhenStart bool
-	onSucc       *prg
-	onFail       *prg
-	onFinish     *prg
 }
 
 type Option func(c *config)
@@ -38,35 +35,5 @@ func WithCronExpression(exp string) Option {
 func WithRunWhenStart(v bool) Option {
 	return func(c *config) {
 		c.runWhenStart = v
-	}
-}
-
-func WithSuccNotify(cmd string, args []string) Option {
-	return func(c *config) {
-		c.onSucc = &prg{
-			remark: "on_succ",
-			cmd:    cmd,
-			args:   args,
-		}
-	}
-}
-
-func WithFailNotify(cmd string, args []string) Option {
-	return func(c *config) {
-		c.onFail = &prg{
-			remark: "on_fail",
-			cmd:    cmd,
-			args:   args,
-		}
-	}
-}
-
-func WithFinishNotify(cmd string, args []string) Option {
-	return func(c *config) {
-		c.onFinish = &prg{
-			remark: "on_finish",
-			cmd:    cmd,
-			args:   args,
-		}
 	}
 }

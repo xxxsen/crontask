@@ -14,12 +14,6 @@ type Program struct {
 	Args    []string `json:"args"`
 }
 
-type Notify struct {
-	Succ   *Program `json:"succ"`
-	Fail   *Program `json:"fail"`
-	Finish *Program `json:"finish"`
-}
-
 type Config struct {
 	TaskName           string           `json:"task_name"`
 	Log                logger.LogConfig `json:"log"`
@@ -27,7 +21,6 @@ type Config struct {
 	CrontaskExpression string           `json:"crontask_expression"`
 	Programs           []Program        `json:"programs"`
 	RunWhenStart       bool             `json:"run_when_start"`
-	Notify             Notify           `json:"notify"`
 }
 
 func Parse(file string) (*Config, error) {
