@@ -22,22 +22,37 @@ func main() {
 	runWithConfig(c)
 }
 
+func generateJobConfigs(c *config.Config) []*tasker.JobConfig {
+	rs := make([]*tasker.JobConfig, 0, len(c.TaskList))
+	for _, tk := range c.TaskList {
+		jb := &tasker.JobConfig{
+			Name:         tk.TaskName,
+			Expr:         tk.Expr,
+			RunWhenStart: tk.RunWhenStart,
+		}
+		for _, p := range tk.Programs {
+			jb.SubTasks = append(jb.SubTasks, &tasker.TaskConfig{
+				Remark:  p.Remark,
+				WorkDir: p.WorkDir,
+				Cmd:     p.Cmd,
+				Args:    p.Args,
+			})
+		}
+		rs = append(rs, jb)
+	}
+	return rs
+}
+
 func runWithConfig(c *config.Config) {
 	logger := logger.Init(c.Log.File, c.Log.Level, int(c.Log.FileCount), int(c.Log.FileSize), int(c.Log.KeepDays), c.Log.Console)
 	logger.Info("recv config", zap.Any("config", *c))
 
-	opts := []tasker.Option{
-		tasker.WithCronExpression(c.CrontaskExpression),
-		tasker.WithRunWhenStart(c.RunWhenStart),
+	tk := tasker.New()
+	jbs := generateJobConfigs(c)
+	for _, jc := range jbs {
+		tk.AddJob(jc)
 	}
-	for _, p := range c.Programs {
-		opts = append(opts, tasker.WithAddProgram(p.Remark, p.WorkDir, p.Cmd, p.Args))
-	}
-	tk, err := tasker.NewTasker(c.TaskName, opts...)
-	if err != nil {
-		logger.Fatal("create tasker fail", zap.Error(err))
-	}
-	logger.Info("create tasker success, start it...")
+	logger.Info("create tasker success, start it...", zap.Int("job_count", len(jbs)))
 	if err := tk.Run(context.Background()); err != nil {
 		logger.Fatal("run tasker fail", zap.Error(err))
 	}

@@ -13,23 +13,35 @@ crontask
         "level": "debug",
         "console": true
     },
-    "tz": "Asia/Shanghai", //timezone
-    "run_when_start": true, //是否启动的时候执行一次
-    "task_name": "default", //任务名
-    "crontask_expression": "*/1 * * * *",
-    "programs": [ //支持多个任务, 按列表顺序进行执行。
+    "task_list": [
         {
-            "remark": "t1",
-            "cmd": "/usr/bin/ls",
-            "args": [
-                "-alh"
+            "task_name": "in_task_list_1", //任务名
+            "expr": "*/1 * * * *", //cron表达式
+            "run_when_start": true, //启动的时候预先执行一次
+            "programs": [ //子任务列表(可以配置多个)
+                {
+                    "remark": "echo 1", 
+                    "workdir": "", //工作目录
+                    "cmd": "echo",
+                    "args": [
+                        "1"
+                    ]
+                }
             ]
         },
         {
-            "remark": "t2",
-            "cmd": "/usr/bin/echo",
-            "args": [
-                "hahaha"
+            "task_name": "in_task_list_2",
+            "expr": "*/1 * * * *",
+            "run_when_start": true,
+            "programs": [
+                {
+                    "remark": "echo 2",
+                    "workdir": "",
+                    "cmd": "echo",
+                    "args": [
+                        "2"
+                    ]
+                }
             ]
         }
     ]

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,53 +15,68 @@ import (
 	"go.uber.org/zap"
 )
 
-type Tasker struct {
-	c    *config
-	name string
-	id   uint64
-	//
-	lck       sync.Mutex
-	isRunning atomic.Value
+type tasker struct {
+	jobs []*JobConfig
 }
 
-func NewTasker(name string, opts ...Option) (*Tasker, error) {
-	if len(name) == 0 {
-		name = "default"
-	}
-	c := &config{}
-	for _, opt := range opts {
-		opt(c)
-	}
-	if len(c.prgs) == 0 {
-		return nil, fmt.Errorf("nil program")
-	}
-	if len(c.expression) == 0 {
-		return nil, fmt.Errorf("nil cron expression")
-	}
-	return &Tasker{name: name, c: c}, nil
+type ITasker interface {
+	Run(ctx context.Context) error
+	AddJob(jb *JobConfig)
 }
 
-func (t *Tasker) Run(ctx context.Context) error {
-	t.isRunning.Store(false)
-	task := t.wrapTask(ctx)
-	if t.c.runWhenStart {
-		task()
-	}
+func New() ITasker {
+	return &tasker{}
+}
+
+func (t *tasker) AddJob(jb *JobConfig) {
+	t.jobs = append(t.jobs, jb)
+}
+
+func (t *tasker) Run(ctx context.Context) error {
 	cr := cron.New()
-	_, err := cr.AddFunc(t.c.expression, task)
-	if err != nil {
-		return fmt.Errorf("add cron task fail, err:%w", err)
+	for _, jb := range t.jobs {
+		if err := t.initAndAddJob(ctx, cr, jb); err != nil {
+			return fmt.Errorf("init job %s failed, err:%w", jb.Name, err)
+		}
 	}
 	cr.Run()
 	return nil
 }
 
-func (t *Tasker) wrapTask(c context.Context) func() {
+func (t *tasker) initAndAddJob(ctx context.Context, cr *cron.Cron, jb *JobConfig) error {
+	if jb.Expr == "" {
+		return fmt.Errorf("job %s has no cron expression", jb.Name)
+	}
+	task := t.wrapTask(ctx, jb)
+	if jb.RunWhenStart {
+		task()
+	}
+	p := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	s, err := p.Parse(jb.Expr)
+	if err != nil {
+		return fmt.Errorf("parse cron expr failed, err:%w", err)
+	}
+	next := s.Next(time.Now())
+	logutil.GetLogger(ctx).Info("add job",
+		zap.String("name", jb.Name),
+		zap.String("expr", jb.Expr),
+		zap.Bool("run_when_start", jb.RunWhenStart),
+		zap.Int("sub_task_count", len(jb.SubTasks)),
+		zap.Time("next_run_time", next),
+	)
+	if _, err := cr.AddFunc(jb.Expr, task); err != nil {
+		return fmt.Errorf("add job %s failed, err:%w", jb.Name, err)
+	}
+	return nil
+}
+
+func (t *tasker) wrapTask(c context.Context, jb *JobConfig) func() {
+	var id uint64
 	return func() {
-		id := atomic.AddUint64(&t.id, 1)
-		ctx := trace.WithTraceId(c, fmt.Sprintf("%s-%d", t.name, id))
+		id := atomic.AddUint64(&id, 1)
+		ctx := trace.WithTraceId(c, fmt.Sprintf("%s-%d", jb.Name, id))
 		start := time.Now()
-		if err := t.runTask(ctx, id); err != nil {
+		if err := t.runTask(ctx, jb); err != nil {
 			logutil.GetLogger(ctx).Info("run job failed", zap.Error(err), zap.Duration("cost", time.Since(start)))
 			return
 		}
@@ -70,62 +84,39 @@ func (t *Tasker) wrapTask(c context.Context) func() {
 	}
 }
 
-func (t *Tasker) runTask(ctx context.Context, id uint64) (err error) {
+func (t *tasker) runTask(ctx context.Context, jb *JobConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			logutil.GetLogger(ctx).Error("run task cause panic", zap.Any("panic", r), zap.String("stack", string(debug.Stack())))
 			err = fmt.Errorf("run task panic, panic:%v, stack:%s", r, string(debug.Stack()))
 			return
 		}
 	}()
-	if !t.isRunning.Load().(bool) {
-		t.lck.Lock()
-		if t.isRunning.Load().(bool) {
-			logutil.GetLogger(ctx).
-				Error("previous task still running, skip current task", zap.Uint64("current_id", id))
-			t.lck.Unlock()
-			return nil
-		}
-		t.isRunning.Store(true)
-		t.lck.Unlock()
+	err = t.runPrograms(ctx, jb.SubTasks)
+	if err != nil {
+		return err
 	}
-	//
-	err = t.runPrograms(ctx, id, t.c.prgs)
-	//
-	t.lck.Lock()
-	t.isRunning.Store(false)
-	t.lck.Unlock()
-	return err
-}
-
-func (t *Tasker) runPrograms(ctx context.Context, id uint64, ps []prg) error {
-	logger := logutil.GetLogger(ctx).With(zap.String("task", t.name), zap.Uint64("id", id))
-	start := time.Now()
-	for idx, p := range ps {
-		if err := t.runProgram(ctx, id, &p); err != nil {
-			logger.Error("exec sub task failed, skip next", zap.String("remark", p.remark), zap.Error(err))
-			return fmt.Errorf("step:%d exec failed, err:[%w]", idx, err)
-		}
-	}
-	logger.Info("task exec succ", zap.Duration("cost", time.Since(start)))
 	return nil
 }
 
-func (t *Tasker) runProgram(ctx context.Context, id uint64, p *prg) error {
-	logger := logutil.GetLogger(ctx).With(zap.Uint64("id", id), zap.String("remark", p.remark))
-	defer func() {
-		if rec := recover(); rec != nil {
-			logger.Error("run program cause panic", zap.Any("err", rec), zap.String("stack", string(debug.Stack())))
-			return
+func (t *tasker) runPrograms(ctx context.Context, tks []*TaskConfig) error {
+	for idx, tk := range tks {
+		start := time.Now()
+		if err := t.runProgram(ctx, tk); err != nil {
+			return fmt.Errorf("exec sub task failed, tidx:%d, remark:%s, err:%w", idx, tk.Remark, err)
 		}
-	}()
-	runner := cmder.New(p.workdir)
+		logutil.GetLogger(ctx).Info("sub task exec succ", zap.Int("idx", idx), zap.String("remark", tk.Remark), zap.Duration("cost", time.Since(start)))
+	}
+	return nil
+}
+
+func (t *tasker) runProgram(ctx context.Context, tk *TaskConfig) error {
+	runner := cmder.New(tk.WorkDir)
 	stdout := bytes.Buffer{}
 	stderr := bytes.Buffer{}
 	runner.SetOutput(&stdout, &stderr)
-	if err := runner.Run(ctx, p.cmd, p.args...); err != nil {
-		return fmt.Errorf("run cmd failed, cmd:%s, err:%w, errmsg:%s", p.cmd, err, stderr.String())
+	if err := runner.Run(ctx, tk.Cmd, tk.Args...); err != nil {
+		return fmt.Errorf("run cmd failed, cmd:%s, args:[%+v], err:%w, errmsg:%s", tk.Cmd, tk.Args, err, stderr.String())
 	}
-	logutil.GetLogger(ctx).Info("run cmd succ", zap.String("cmd", p.cmd), zap.String("stdout", stdout.String()), zap.String("stderr", stderr.String()))
+	logutil.GetLogger(ctx).Info("run cmd succ", zap.String("cmd", tk.Cmd), zap.Strings("args", tk.Args), zap.String("stdout", stdout.String()), zap.String("stderr", stderr.String()))
 	return nil
 }
