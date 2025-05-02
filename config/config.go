@@ -38,7 +38,9 @@ func Parse(file string) (*Config, error) {
 	if err = json.Unmarshal(raw, c); err != nil {
 		return nil, err
 	}
-	c.TaskList = append(c.TaskList, *c.TaskConfig)
+	if c.TaskConfig != nil {
+		c.TaskList = append(c.TaskList, *c.TaskConfig)
+	}
 	for _, item := range c.TaskList {
 		if item.Expr == "" {
 			item.Expr = item.CrontaskExpression
